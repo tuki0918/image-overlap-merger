@@ -103,14 +103,14 @@ class ImageOverlapMerger:
     
     def merge_vertical(self, img_a: np.ndarray, img_b: np.ndarray, overlap: int) -> np.ndarray:
         """縦方向に画像を結合"""
-        # img_aの全体 + img_bの重複部分を除いた部分
-        result = np.vstack([img_a, img_b[overlap:]])
+        # img_aの重複部分を除いた部分 + img_bの全体
+        result = np.vstack([img_a[:-overlap], img_b])
         return result
     
     def merge_horizontal(self, img_a: np.ndarray, img_b: np.ndarray, overlap: int) -> np.ndarray:
         """横方向に画像を結合"""
-        # img_aの全体 + img_bの重複部分を除いた部分
-        result = np.hstack([img_a, img_b[:, overlap:]])
+        # img_aの重複部分を除いた部分 + img_bの全体
+        result = np.hstack([img_a[:, :-overlap], img_b])
         return result
     
     def merge_images(self, img_a: Image.Image, img_b: Image.Image, direction: str) -> Tuple[Optional[Image.Image], str]:
@@ -118,8 +118,8 @@ class ImageOverlapMerger:
         2枚の画像を指定方向で結合
         
         Args:
-            img_a: ベース画像（大きい画像）
-            img_b: 重なる画像（レイヤーが上）
+            img_a: ベース画像（下レイヤー）
+            img_b: オーバーレイ画像（上レイヤー - 重複部分で優先される）
             direction: "portrait" (縦) or "horizon" (横)
             
         Returns: (結合画像, ステータスメッセージ)
@@ -198,8 +198,8 @@ def create_gradio_interface():
     demo = gr.Interface(
         fn=process_two_images,
         inputs=[
-            gr.Image(type="pil", label="Image A (Base Image - Top-left origin)"),
-            gr.Image(type="pil", label="Image B (Overlay Image)"),
+            gr.Image(type="pil", label="Image A (Base Image - Bottom layer - Top-Left origin)"),
+            gr.Image(type="pil", label="Image B (Overlay Image - Top layer)"),
             gr.Radio(
                 choices=[
                     ("Vertical", "portrait"),
