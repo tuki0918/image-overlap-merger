@@ -20,9 +20,15 @@ uv run app.py
 |:---------------:|:---------------:|:---------------:|
 |![](.docs/input_t.png) | ![](.docs/input_b.png) | ![](.docs/outout_horizon.png) |
 
+> [!NOTE]
+> Images must have the same width for vertical merging.
+
 
 ### Horizontal Merge
 
 | Input 1 | Input 2 | Output |
 |:---------------:|:---------------:|:---------------:|
 |![](.docs/input_l.png) | ![](.docs/input_r.png) | ![](.docs/outout_horizon.png) |
+
+> [!NOTE]
+> Images must have the same height for horizontal merging.
