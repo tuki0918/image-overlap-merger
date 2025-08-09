@@ -101,19 +101,27 @@ class ImageOverlapMerger:
         else:
             return None, 0, "No matching region found for horizontal merge"
     
-    def merge_vertical(self, img_a: np.ndarray, img_b: np.ndarray, overlap: int) -> np.ndarray:
+    def merge_vertical(self, img_a: np.ndarray, img_b: np.ndarray, overlap: int, priority: str = "B") -> np.ndarray:
         """縦方向に画像を結合"""
-        # img_aの重複部分を除いた部分 + img_bの全体
-        result = np.vstack([img_a[:-overlap], img_b])
+        if priority == "A":
+            # img_aの全体 + img_bの重複部分を除いた部分
+            result = np.vstack([img_a, img_b[overlap:]])
+        else:  # priority == "B" (デフォルト)
+            # img_aの重複部分を除いた部分 + img_bの全体
+            result = np.vstack([img_a[:-overlap], img_b])
         return result
     
-    def merge_horizontal(self, img_a: np.ndarray, img_b: np.ndarray, overlap: int) -> np.ndarray:
+    def merge_horizontal(self, img_a: np.ndarray, img_b: np.ndarray, overlap: int, priority: str = "B") -> np.ndarray:
         """横方向に画像を結合"""
-        # img_aの重複部分を除いた部分 + img_bの全体
-        result = np.hstack([img_a[:, :-overlap], img_b])
+        if priority == "A":
+            # img_aの全体 + img_bの重複部分を除いた部分
+            result = np.hstack([img_a, img_b[:, overlap:]])
+        else:  # priority == "B" (デフォルト)
+            # img_aの重複部分を除いた部分 + img_bの全体
+            result = np.hstack([img_a[:, :-overlap], img_b])
         return result
     
-    def merge_images(self, img_a: Image.Image, img_b: Image.Image, direction: str) -> Tuple[Optional[Image.Image], str]:
+    def merge_images(self, img_a: Image.Image, img_b: Image.Image, direction: str, priority: str = "B") -> Tuple[Optional[Image.Image], str]:
         """
         2枚の画像を指定方向で結合
         
@@ -121,6 +129,7 @@ class ImageOverlapMerger:
             img_a: ベース画像（下レイヤー）
             img_b: オーバーレイ画像（上レイヤー - 重複部分で優先される）
             direction: "portrait" (縦) or "horizon" (横)
+            priority: "A" (Image A優先) or "B" (Image B優先, デフォルト)
             
         Returns: (結合画像, ステータスメッセージ)
         """
@@ -132,14 +141,14 @@ class ImageOverlapMerger:
         h_a, w_a = np_a.shape[:2]
         h_b, w_b = np_b.shape[:2]
         
-        size_info = f"Image A: {h_a}×{w_a}px, Image B: {h_b}×{w_b}px\n"
+        size_info = f"Image A: {h_a}×{w_a}px, Image B: {h_b}×{w_b}px (Priority: Image {priority})\n"
         
         if direction == "portrait":
             # 縦方向結合
             overlap, offset, message = self.find_best_overlap_vertical(np_a, np_b)
             
             if overlap is not None:
-                merged = self.merge_vertical(np_a, np_b, overlap)
+                merged = self.merge_vertical(np_a, np_b, overlap, priority)
                 final_image = self.numpy_to_pil(merged)
                 
                 final_h, final_w = merged.shape[:2]
@@ -154,7 +163,7 @@ class ImageOverlapMerger:
             overlap, offset, message = self.find_best_overlap_horizontal(np_a, np_b)
             
             if overlap is not None:
-                merged = self.merge_horizontal(np_a, np_b, overlap)
+                merged = self.merge_horizontal(np_a, np_b, overlap, priority)
                 final_image = self.numpy_to_pil(merged)
                 
                 final_h, final_w = merged.shape[:2]
@@ -168,7 +177,7 @@ class ImageOverlapMerger:
             return None, f"❌ Invalid direction: {direction} (Please specify 'portrait' or 'horizon')"
 
 
-def process_two_images(img_a, img_b, direction) -> Tuple[Optional[Image.Image], str]:
+def process_two_images(img_a, img_b, direction, priority) -> Tuple[Optional[Image.Image], str]:
     """画像処理関数"""
     
     if not img_a or not img_b:
@@ -186,7 +195,7 @@ def process_two_images(img_a, img_b, direction) -> Tuple[Optional[Image.Image], 
         
         # 結合処理
         merger = ImageOverlapMerger()
-        result_image, status_message = merger.merge_images(img_a, img_b, direction)
+        result_image, status_message = merger.merge_images(img_a, img_b, direction, priority)
         
         return result_image, status_message
         
@@ -198,8 +207,8 @@ def create_gradio_interface():
     demo = gr.Interface(
         fn=process_two_images,
         inputs=[
-            gr.Image(type="pil", label="Image A (Base Image - Bottom layer - Top-Left origin)"),
-            gr.Image(type="pil", label="Image B (Overlay Image - Top layer)"),
+            gr.Image(type="pil", label="Image A (Left/Top position)"),
+            gr.Image(type="pil", label="Image B (Right/Bottom position)"),
             gr.Radio(
                 choices=[
                     ("Vertical", "portrait"),
@@ -207,6 +216,14 @@ def create_gradio_interface():
                 ],
                 value="portrait",
                 label="Merge Direction"
+            ),
+            gr.Radio(
+                choices=[
+                    ("Image A", "A"),
+                    ("Image B", "B"),
+                ],
+                value="B",
+                label="Overlap Priority"
             )
         ],
         outputs=[
