@@ -121,7 +121,44 @@ class ImageOverlapMerger:
             result = np.hstack([img_a[:, :-overlap], img_b])
         return result
     
-    def merge_images(self, img_a: Image.Image, img_b: Image.Image, direction: str, priority: str = "B") -> Tuple[Optional[Image.Image], str]:
+    def create_overlap_mask(self, img_a: np.ndarray, img_b: np.ndarray, direction: str, overlap: int) -> Tuple[Image.Image, Image.Image]:
+        """
+        重複領域のマスクを作成
+        
+        Args:
+            img_a: ベース画像
+            img_b: オーバーレイ画像
+            direction: "portrait" (縦) or "horizon" (横)
+            overlap: 重複ピクセル数
+            
+        Returns: (Image Aのマスク, Image Bのマスク)
+        """
+        h_a, w_a = img_a.shape[:2]
+        h_b, w_b = img_b.shape[:2]
+        
+        if direction == "portrait":
+            # 縦方向結合の場合
+            # Image Aのマスク：下部のoverlap行が白（重複領域）
+            mask_a = np.zeros((h_a, w_a), dtype=np.uint8)
+            mask_a[h_a-overlap:h_a, :] = 255
+            
+            # Image Bのマスク：上部のoverlap行が白（重複領域）
+            mask_b = np.zeros((h_b, w_b), dtype=np.uint8)
+            mask_b[:overlap, :] = 255
+            
+        else:  # horizon
+            # 横方向結合の場合
+            # Image Aのマスク：右部のoverlap列が白（重複領域）
+            mask_a = np.zeros((h_a, w_a), dtype=np.uint8)
+            mask_a[:, w_a-overlap:w_a] = 255
+            
+            # Image Bのマスク：左部のoverlap列が白（重複領域）
+            mask_b = np.zeros((h_b, w_b), dtype=np.uint8)
+            mask_b[:, :overlap] = 255
+        
+        return Image.fromarray(mask_a), Image.fromarray(mask_b)
+    
+    def merge_images(self, img_a: Image.Image, img_b: Image.Image, direction: str, priority: str = "B") -> Tuple[Optional[Image.Image], str, Optional[Image.Image], Optional[Image.Image]]:
         """
         2枚の画像を指定方向で結合
         
@@ -131,7 +168,7 @@ class ImageOverlapMerger:
             direction: "portrait" (縦) or "horizon" (横)
             priority: "A" (Image A優先) or "B" (Image B優先, デフォルト)
             
-        Returns: (結合画像, ステータスメッセージ)
+        Returns: (結合画像, ステータスメッセージ, Image Aマスク, Image Bマスク)
         """
         # NumPy配列に変換
         np_a = self.pil_to_numpy(img_a)
@@ -148,43 +185,49 @@ class ImageOverlapMerger:
             overlap, offset, message = self.find_best_overlap_vertical(np_a, np_b)
             
             if overlap is not None:
+                # マスクを作成
+                mask_a, mask_b = self.create_overlap_mask(np_a, np_b, direction, overlap)
+                
                 merged = self.merge_vertical(np_a, np_b, overlap, priority)
                 final_image = self.numpy_to_pil(merged)
                 
                 final_h, final_w = merged.shape[:2]
                 result_message = f"{size_info}✅ {message}\nMerged size: {final_h}×{final_w}px"
                 
-                return final_image, result_message
+                return final_image, result_message, mask_a, mask_b
             else:
-                return None, f"{size_info}❌ {message}"
+                return None, f"{size_info}❌ {message}", None, None
         
         elif direction == "horizon":
             # 横方向結合
             overlap, offset, message = self.find_best_overlap_horizontal(np_a, np_b)
             
             if overlap is not None:
+                # マスクを作成
+                mask_a, mask_b = self.create_overlap_mask(np_a, np_b, direction, overlap)
+                
                 merged = self.merge_horizontal(np_a, np_b, overlap, priority)
                 final_image = self.numpy_to_pil(merged)
                 
                 final_h, final_w = merged.shape[:2]
                 result_message = f"{size_info}✅ {message}\nMerged size: {final_h}×{final_w}px"
                 
-                return final_image, result_message
+                return final_image, result_message, mask_a, mask_b
             else:
-                return None, f"{size_info}❌ {message}"
+                return None, f"{size_info}❌ {message}", None, None
         
         else:
-            return None, f"❌ Invalid direction: {direction} (Please specify 'portrait' or 'horizon')"
+            return None, f"❌ Invalid direction: {direction} (Please specify 'portrait' or 'horizon')", None, None
 
 
-def process_two_images(img_a, img_b, direction, priority) -> Tuple[Optional[Image.Image], str]:
+def process_two_images(img_a, img_b, direction, priority) -> Tuple[Optional[Image.Image], str, Optional[Image.Image], Optional[Image.Image]]:
     """画像処理関数"""
     
     if not img_a or not img_b:
-        return None, "❌ Please upload both Image A (base) and Image B (overlay)"
+        return None, "❌ Please upload both Image A (base) and Image B (overlay)", None, None
     
     if not direction:
-        return None, "❌ Please select merge direction (vertical or horizontal)"
+        return None, "❌ Please select merge direction (vertical or horizontal)", None, None
     
     try:
         # RGBモードに変換
@@ -195,12 +238,12 @@ def process_two_images(img_a, img_b, direction, priority) -> Tuple[Optional[Imag
         
         # 結合処理
         merger = ImageOverlapMerger()
-        result_image, status_message = merger.merge_images(img_a, img_b, direction, priority)
+        result_image, status_message, mask_a, mask_b = merger.merge_images(img_a, img_b, direction, priority)
         
-        return result_image, status_message
+        return result_image, status_message, mask_a, mask_b
         
     except Exception as e:
-        return None, f"❌ Processing error: {str(e)}"
+        return None, f"❌ Processing error: {str(e)}", None, None
 
 
 def create_gradio_interface():
@@ -228,10 +271,12 @@ def create_gradio_interface():
         ],
         outputs=[
             gr.Image(type="pil", label="Output Image", format="png"),
-            gr.Textbox(label="Message", lines=5)
+            gr.Textbox(label="Message", lines=5),
+            gr.Image(type="pil", label="Image A Overlap Mask (White=Overlap)", format="png"),
+            gr.Image(type="pil", label="Image B Overlap Mask (White=Overlap)", format="png")
         ],
         title="Image Overlap Merger",
-        description="Automatically detect and merge overlapping regions of two images",
+        description="Automatically detect and merge overlapping regions of two images. Masks show the detected overlap regions.",
         flagging_mode="never"
     )
     
