@@ -247,39 +247,58 @@ def process_two_images(img_a, img_b, direction, priority) -> Tuple[Optional[Imag
 
 
 def create_gradio_interface():
-    demo = gr.Interface(
-        fn=process_two_images,
-        inputs=[
-            gr.Image(type="pil", label="Image A (Left/Top position)"),
-            gr.Image(type="pil", label="Image B (Right/Bottom position)"),
-            gr.Radio(
-                choices=[
-                    ("Vertical", "portrait"),
-                    ("Horizontal", "horizon")
-                ],
-                value="portrait",
-                label="Merge Direction"
-            ),
-            gr.Radio(
-                choices=[
-                    ("Image A", "A"),
-                    ("Image B", "B"),
-                ],
-                value="B",
-                label="Overlap Priority"
-            )
-        ],
-        outputs=[
-            gr.Image(type="pil", label="Output Image", format="png"),
-            gr.Textbox(label="Message", lines=5),
-            gr.Image(type="pil", label="Image A Overlap Mask (White=Overlap)", format="png"),
-            gr.Image(type="pil", label="Image B Overlap Mask (White=Overlap)", format="png")
-        ],
-        title="Image Overlap Merger",
-        description="Automatically detect and merge overlapping regions of two images. Masks show the detected overlap regions.",
-        flagging_mode="never"
-    )
-    
+    with gr.Blocks(title="Image Overlap Merger") as demo:
+        gr.Markdown("<h2 style='text-align:center;'>Image Overlap Merger</h2>")
+        gr.Markdown(
+            "Automatically detect and merge overlapping regions of two images. "
+            "Masks show the detected overlap regions."
+        )
+
+        with gr.Row():
+            # 左カラム（入力）
+            with gr.Column():
+                with gr.Row():
+                    img_a = gr.Image(type="pil", label="Image A (Left/Top position)")
+                    img_b = gr.Image(type="pil", label="Image B (Right/Bottom position)")
+
+                merge_dir = gr.Radio(
+                    choices=[("Vertical", "portrait"), ("Horizontal", "horizon")],
+                    value="portrait",
+                    label="Merge Direction"
+                )
+
+                overlap_priority = gr.Radio(
+                    choices=[("Image A", "A"), ("Image B", "B")],
+                    value="B",
+                    label="Overlap Priority"
+                )
+
+                with gr.Row():
+                    cancel_btn = gr.Button("Cancel", variant="secondary")
+                    run_btn = gr.Button("Submit", variant="primary")
+
+            # 右カラム（出力）
+            with gr.Column():
+                output_image = gr.Image(type="pil", label="Output Image", format="png")
+                with gr.Row():
+                    mask_a = gr.Image(type="pil", label="Image A Overlap Mask", format="png")
+                    mask_b = gr.Image(type="pil", label="Image B Overlap Mask", format="png")
+                message = gr.Textbox(label="Message", lines=5)
+
+        # Run
+        run_btn.click(
+            fn=process_two_images,
+            inputs=[img_a, img_b, merge_dir, overlap_priority],
+            outputs=[output_image, message, mask_a, mask_b]
+        )
+
+        # Cancel
+        cancel_btn.click(
+            fn=lambda: (None, None, "portrait", "B"),
+            inputs=[],
+            outputs=[img_a, img_b, merge_dir, overlap_priority]
+        )
+
     return demo
 
 
