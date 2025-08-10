@@ -339,8 +339,8 @@ def create_gradio_interface():
             # 左カラム（入力）
             with gr.Column():
                 with gr.Row():
-                    img_a = gr.Image(type="pil", label="Image A (Left/Top position)")
-                    img_b = gr.Image(type="pil", label="Image B (Right/Bottom position)")
+                    img_a = gr.Image(type="pil", label="Image A")
+                    img_b = gr.Image(type="pil", label="Image B")
 
                 merge_type = gr.Radio(
                     choices=[("Vertical", "vertical"), ("Horizontal", "horizontal")],
