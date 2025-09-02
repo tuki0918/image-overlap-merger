@@ -168,23 +168,47 @@ class ImageOverlapMerger:
         priority: str = "B",
         direction: str = "normal",
     ) -> np.ndarray:
-        """縦方向に画像を結合（両方向対応）"""
+        """縦方向に画像を結合（両方向対応、内包するパターンに対応）"""
+        h_a, w_a = img_a.shape[:2]
+        h_b, w_b = img_b.shape[:2]
+        
         if direction == "normal":
-            # A下部 + B上部（従来）
+            # A下部 + B上部
             if priority == "A":
                 # img_aの全体 + img_bの重複部分を除いた部分
                 result = np.vstack([img_a, img_b[overlap:]])
             else:
-                # img_aの重複部分を除いた部分 + img_bの全体
-                result = np.vstack([img_a[:-overlap], img_b])
+                # 内包パターンに対応: img_bがoverlap領域より小さい場合
+                if h_b <= overlap:
+                    # img_bが完全にoverlapの中に収まる場合
+                    # img_aの重複開始位置からimg_bで置き換え、残りはimg_aを保持
+                    overlap_start = h_a - overlap
+                    result = np.vstack([
+                        img_a[:overlap_start],     # img_aの重複前の部分
+                        img_b,                     # img_bの全体
+                        img_a[overlap_start + h_b:]  # img_aの残り部分
+                    ])
+                else:
+                    # 従来の処理: img_bがoverlapより大きい場合
+                    result = np.vstack([img_a[:-overlap], img_b])
         else:  # direction == "reverse"
             # A上部 + B下部（逆方向）
             if priority == "A":
                 # Bの重複部分を除いた部分 + img_aの全体
                 result = np.vstack([img_b[:-overlap], img_a])
             else:
-                # img_bの全体 + img_aの重複部分を除いた部分
-                result = np.vstack([img_b, img_a[overlap:]])
+                # 内包パターンに対応: img_bがoverlap領域より小さい場合
+                if h_b <= overlap:
+                    # img_bが完全にoverlapの中に収まる場合
+                    # img_aの重複終了位置まではimg_aを保持、重複部分はimg_bで置き換え
+                    result = np.vstack([
+                        img_a[:overlap - h_b],     # img_aの重複前の部分
+                        img_b,                     # img_bの全体  
+                        img_a[overlap:]            # img_aの重複後の部分
+                    ])
+                else:
+                    # 従来の処理: img_bがoverlapより大きい場合
+                    result = np.vstack([img_b, img_a[overlap:]])
         return result
 
     def merge_horizontal(
@@ -195,23 +219,47 @@ class ImageOverlapMerger:
         priority: str = "B",
         direction: str = "normal",
     ) -> np.ndarray:
-        """横方向に画像を結合（両方向対応）"""
+        """横方向に画像を結合（両方向対応、内包するパターンに対応）"""
+        h_a, w_a = img_a.shape[:2]
+        h_b, w_b = img_b.shape[:2]
+        
         if direction == "normal":
-            # A右部 + B左部（従来）
+            # A右部 + B左部
             if priority == "A":
                 # img_aの全体 + img_bの重複部分を除いた部分
                 result = np.hstack([img_a, img_b[:, overlap:]])
             else:
-                # img_aの重複部分を除いた部分 + img_bの全体
-                result = np.hstack([img_a[:, :-overlap], img_b])
+                # 内包パターンに対応: img_bがoverlap領域より小さい場合
+                if w_b <= overlap:
+                    # img_bが完全にoverlapの中に収まる場合
+                    # img_aの重複開始位置からimg_bで置き換え、残りはimg_aを保持
+                    overlap_start = w_a - overlap
+                    result = np.hstack([
+                        img_a[:, :overlap_start],  # img_aの重複前の部分
+                        img_b,                     # img_bの全体
+                        img_a[:, overlap_start + w_b:]  # img_aの残り部分
+                    ])
+                else:
+                    # 従来の処理: img_bがoverlapより大きい場合
+                    result = np.hstack([img_a[:, :-overlap], img_b])
         else:
             # A左部 + B右部（逆方向）
             if priority == "A":
                 # Bの重複部分を除いた部分 + img_aの全体
                 result = np.hstack([img_b[:, :-overlap], img_a])
             else:  # priority == "B" (デフォルト)
-                # img_bの全体 + img_aの重複部分を除いた部分
-                result = np.hstack([img_b, img_a[:, overlap:]])
+                # 内包パターンに対応: img_bがoverlap領域より小さい場合
+                if w_b <= overlap:
+                    # img_bが完全にoverlapの中に収まる場合
+                    # img_aの重複終了位置まではimg_aを保持、重複部分はimg_bで置き換え
+                    result = np.hstack([
+                        img_a[:, :overlap - w_b],  # img_aの重複前の部分
+                        img_b,                     # img_bの全体  
+                        img_a[:, overlap:]         # img_aの重複後の部分
+                    ])
+                else:
+                    # 従来の処理: img_bがoverlapより大きい場合
+                    result = np.hstack([img_b, img_a[:, overlap:]])
         return result
 
     def create_overlap_mask(
